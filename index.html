@@ -33,7 +33,7 @@
 
                 <!-- Video vertical y transporte -->
                 <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex flex-col sm:flex-row gap-4 items-center">
-                    <div class="relative bg-black rounded-lg overflow-hidden shadow-lg w-32 h-56 flex-shrink-0 flex items-center justify-center border border-zinc-800">
+                    <div class="relative bg-black rounded-lg overflow-hidden shadow-lg w-40 h-72 flex-shrink-0 flex items-center justify-center border border-zinc-800">
                         <video id="videoPlayer" class="w-full h-full object-cover" muted playsinline></video>
                     </div>
 
@@ -59,7 +59,13 @@
                 <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-3">
                     <div class="flex items-center justify-between text-xs text-zinc-400">
                         <span class="font-semibold text-zinc-300">Forma de onda y marcas de los pads</span>
-                        <span class="text-zinc-500">Clic en la onda = mover el cursor</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-zinc-500 hidden md:inline mr-1">Zoom:</span>
+                            <button id="btnZoomOut" class="bg-zinc-800 hover:bg-zinc-700 w-7 py-0.5 rounded border border-zinc-700 text-zinc-200 transition" title="Alejar">−</button>
+                            <button id="btnZoomIn" class="bg-zinc-800 hover:bg-zinc-700 w-7 py-0.5 rounded border border-zinc-700 text-zinc-200 transition" title="Acercar">+</button>
+                            <button id="btnZoomAll" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-0.5 rounded border border-zinc-700 text-zinc-300 transition" title="Ver toda la onda">Todo</button>
+                            <span id="zoomVal" class="font-mono text-zinc-300 w-12 text-right">1.0x</span>
+                        </div>
                     </div>
 
                     <div id="waveWrap" class="relative w-full h-24 bg-zinc-950 rounded-lg border border-zinc-800 overflow-hidden cursor-pointer">
@@ -67,6 +73,9 @@
                         <div id="regionsLayer" class="absolute inset-0 pointer-events-none"></div>
                         <div id="playhead" class="absolute top-0 bottom-0 bg-rose-500 pointer-events-none" style="left:0%; width:2px; z-index:20;"></div>
                     </div>
+
+                    <input type="range" id="panRange" min="0" max="1000" step="1" value="0" disabled class="w-full accent-violet-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+                    <p class="text-[11px] text-zinc-500">Clic en la onda = mover el cursor · Rueda del mouse = zoom · Shift + rueda (o la barra de arriba) = desplazarte</p>
 
                     <div class="flex flex-wrap items-center gap-2 text-xs">
                         <span id="selInfo" class="font-mono text-zinc-300 mr-auto">Tocá un pad para seleccionarlo</span>
@@ -126,7 +135,7 @@
             <div class="lg:col-span-5 bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex flex-col justify-between space-y-3">
                 <div>
                     <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Pads de CUE & Trigger</h3>
-                    <p class="text-[11px] text-zinc-500 mb-3">Pad vacío: guarda la posición actual como inicio (dura 1 s, ajustalo arrastrando los bordes en la onda). Pad con marca: tocalo para disparar, mantenelo para loop. También funcionan las teclas 1 2 3 4 / Q W E R / A S D F / Z X C V.</p>
+                    <p class="text-[11px] text-zinc-500 mb-3">Pad vacío: guarda la posición actual como inicio (dura 1 s, ajustalo arrastrando los bordes en la onda). Pad con marca: tocalo para disparar, mantenelo para loop. También funcionan las teclas 1 2 3 4 / Q W E R / A S D F / Z X C V. Shift + tecla (o Shift + clic en el pad) borra ese pad.</p>
                 </div>
 
                 <div id="cuePadsGrid" class="grid grid-cols-4 gap-2.5 flex-1 auto-rows-fr"></div>
@@ -156,6 +165,7 @@
         const NUM_PADS = 16;
         const MIN_LEN = 0.02;           // largo mínimo de un sample (segundos)
         const KEYS = '1234qwerasdfzxcv'; // teclas que disparan los pads 1..16
+        const CODES = ['Digit1','Digit2','Digit3','Digit4','KeyQ','KeyW','KeyE','KeyR','KeyA','KeyS','KeyD','KeyF','KeyZ','KeyX','KeyC','KeyV'];
 
         let audioCtx = null;
         let fx = {};
@@ -163,6 +173,8 @@
         let duration = 0;
         let waveScale = 1;
         let videoUrl = null;
+        let viewStart = 0;              // inicio de lo que se ve en la onda (segundos)
+        let viewLen = 0;                // cuántos segundos se ven (zoom)
 
         let pads = new Array(NUM_PADS).fill(null); // cada pad: { start, end } en segundos
         let selected = -1;
@@ -330,6 +342,8 @@
             src.onended = () => { if (voice === v) finishVoice(v); };
             voice = v;
 
+            if (opts.padIndex === -1) showRange(opts.start, opts.start);
+
             // el video solo acompaña visualmente
             try { video.currentTime = opts.start; } catch (e) {}
             video.playbackRate = rate;
@@ -430,6 +444,7 @@
             const s = clamp(pos, 0, Math.max(0, duration - 0.05));
             const e = Math.min(s + 1, duration);
             pads[i] = { start: s, end: Math.max(e, s + MIN_LEN) };
+            showRange(pads[i].start, pads[i].end);
             refreshAll();
         }
 
@@ -460,9 +475,17 @@
             }
         }
 
+        function clearPad(i) {
+            if (voice && voice.padIndex === i) stopVoice(true);
+            held.delete(i);
+            pads[i] = null;
+            refreshAll();
+        }
+
         function select(i) {
             if (selected === i) return;
             selected = i;
+            if (pads[i]) showRange(pads[i].start, pads[i].end);
             refreshAll();
         }
 
@@ -474,7 +497,11 @@
                 pad.innerHTML = `
                     <span class="text-[10px] text-zinc-500 mb-1 n"></span>
                     <span class="t text-[10px]"></span>`;
-                pad.addEventListener('pointerdown', (e) => { e.preventDefault(); padDown(i); });
+                pad.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    if (e.shiftKey) { clearPad(i); return; }
+                    padDown(i);
+                });
                 pad.addEventListener('pointerup', () => padUp(i));
                 pad.addEventListener('pointercancel', () => padUp(i));
                 pad.addEventListener('pointerleave', () => padUp(i));
@@ -520,6 +547,7 @@
             for (let i = 0; i < NUM_PADS; i++) updatePad(i);
             lastActivePad = -2;
             renderRegions();
+            updateZoomUI();
             updateSelInfo();
         }
 
@@ -530,8 +558,8 @@
             const el = regionEls[i];
             const p = pads[i];
             if (!el || !p || !duration) return;
-            el.style.left = (p.start / duration * 100) + '%';
-            el.style.width = ((p.end - p.start) / duration * 100) + '%';
+            el.style.left = ((p.start - viewStart) / viewLen * 100) + '%';
+            el.style.width = ((p.end - p.start) / viewLen * 100) + '%';
         }
 
         function startDrag(e, mode, i) {
@@ -542,7 +570,7 @@
             const move = (ev) => {
                 const p = pads[i];
                 if (!p) return;
-                const dt = (ev.clientX - x0) / rect.width * duration;
+                const dt = (ev.clientX - x0) / rect.width * viewLen;
                 if (mode === 'start') {
                     p.start = clamp(p0.start + dt, 0, p0.end - MIN_LEN);
                 } else if (mode === 'end') {
@@ -635,8 +663,33 @@
         wave.addEventListener('pointerdown', (e) => {
             if (!buffer) return;
             const rect = wave.getBoundingClientRect();
-            seekTo((e.clientX - rect.left) / rect.width * duration);
+            seekTo(viewStart + (e.clientX - rect.left) / rect.width * viewLen);
         });
+
+        // Zoom: botones, barra de desplazamiento y rueda del mouse
+        $('btnZoomIn').addEventListener('click', () => zoomBy(2, focusTime()));
+        $('btnZoomOut').addEventListener('click', () => zoomBy(0.5, focusTime()));
+        $('btnZoomAll').addEventListener('click', () => setView(0, duration));
+        $('panRange').addEventListener('input', (e) => {
+            if (!duration) return;
+            const range = duration - viewLen;
+            viewStart = clamp(parseFloat(e.target.value) / 1000 * range, 0, range);
+            drawWave();
+            for (let i = 0; i < NUM_PADS; i++) updateRegionPos(i);
+        });
+        wave.addEventListener('wheel', (e) => {
+            if (!buffer) return;
+            e.preventDefault();
+            const rect = wave.getBoundingClientRect();
+            const horizontal = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+            if (horizontal) {
+                const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                setView(viewStart + d / rect.width * viewLen, viewLen);
+            } else {
+                const tAt = viewStart + (e.clientX - rect.left) / rect.width * viewLen;
+                zoomBy(Math.exp(-e.deltaY * 0.0025), tAt);
+            }
+        }, { passive: false });
 
         // Botones para ajustar el pad seleccionado con el cursor actual
         $('btnSetStart').addEventListener('click', () => {
@@ -672,6 +725,49 @@
         // ------------------------------------------------------------
         // DIBUJO DE LA FORMA DE ONDA
         // ------------------------------------------------------------
+        function updateZoomUI() {
+            const pan = $('panRange');
+            if (!duration || !viewLen) {
+                $('zoomVal').textContent = '1.0x';
+                pan.disabled = true;
+                pan.value = 0;
+                return;
+            }
+            $('zoomVal').textContent = (duration / viewLen).toFixed(1) + 'x';
+            const range = duration - viewLen;
+            pan.disabled = range <= 0.001;
+            pan.value = range > 0.001 ? Math.round(viewStart / range * 1000) : 0;
+        }
+
+        function setView(start, len) {
+            if (!duration) return;
+            viewLen = clamp(len, Math.min(0.1, duration), duration);
+            viewStart = clamp(start, 0, duration - viewLen);
+            drawWave();
+            for (let i = 0; i < NUM_PADS; i++) updateRegionPos(i);
+            updateZoomUI();
+        }
+
+        function zoomBy(factor, centerTime) {
+            if (!duration) return;
+            const newLen = clamp(viewLen / factor, Math.min(0.1, duration), duration);
+            const ratio = (centerTime - viewStart) / viewLen;
+            setView(centerTime - ratio * newLen, newLen);
+        }
+
+        function focusTime() {
+            const p = currentPos();
+            return (p >= viewStart && p <= viewStart + viewLen) ? p : viewStart + viewLen / 2;
+        }
+
+        // Si lo que quiero ver está fuera de la vista, la centro ahí
+        function showRange(a, b) {
+            if (!duration || !viewLen) return;
+            if (b < viewStart || a > viewStart + viewLen) {
+                setView((a + b) / 2 - viewLen / 2, viewLen);
+            }
+        }
+
         function drawWave() {
             const dpr = window.devicePixelRatio || 1;
             const w = wave.clientWidth;
@@ -693,7 +789,9 @@
 
             const data = buffer.getChannelData(0);
             const mid = H / 2;
-            const spp = data.length / W;
+            const sr = buffer.sampleRate;
+            const startIdx = viewStart * sr;
+            const spp = (viewLen * sr) / W;
             const stride = Math.max(1, Math.floor(spp / 40));
 
             g.fillStyle = '#3f3f46';
@@ -702,8 +800,8 @@
             g.fillStyle = '#8b8b94';
             for (let x = 0; x < W; x++) {
                 let min = 1, max = -1;
-                const s = Math.floor(x * spp);
-                const e = Math.min(data.length, Math.floor((x + 1) * spp));
+                const s = Math.floor(startIdx + x * spp);
+                const e = Math.min(data.length, Math.max(s + 1, Math.floor(startIdx + (x + 1) * spp)));
                 for (let j = s; j < e; j += stride) {
                     const v = data[j];
                     if (v < min) min = v;
@@ -733,6 +831,8 @@
             buffer = null;
             duration = 0;
             held.clear();
+            viewStart = 0;
+            viewLen = 0;
             refreshAll();
             drawWave();
         }
@@ -754,6 +854,8 @@
                 const decoded = await c.decodeAudioData(arr);
                 buffer = decoded;
                 duration = decoded.duration;
+                viewStart = 0;
+                viewLen = duration;
 
                 // normalización visual de la onda
                 const d = decoded.getChannelData(0);
@@ -802,12 +904,15 @@
             if (e.ctrlKey || e.metaKey || e.altKey) return;
             if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) togglePlay(); return; }
             if (e.repeat) return;
-            const i = KEYS.indexOf(e.key.toLowerCase());
-            if (i >= 0) { e.preventDefault(); padDown(i); }
+            const i = CODES.indexOf(e.code);
+            if (i >= 0) {
+                e.preventDefault();
+                if (e.shiftKey) clearPad(i); else padDown(i);
+            }
         });
         document.addEventListener('keyup', (e) => {
             if (e.code === 'Space') { e.preventDefault(); return; }
-            const i = KEYS.indexOf(e.key.toLowerCase());
+            const i = CODES.indexOf(e.code);
             if (i >= 0) padUp(i);
         });
         window.addEventListener('blur', () => { Array.from(held).forEach(padUp); });
@@ -825,7 +930,15 @@
 
         function tick() {
             const pos = currentPos();
-            if (duration) playheadEl.style.left = (clamp(pos / duration, 0, 1) * 100) + '%';
+            if (duration && viewLen > 0) {
+                // reproduciendo con Play: si el cursor se sale por la derecha, la vista avanza
+                if (voice && voice.padIndex === -1 && viewLen < duration && pos > viewStart + viewLen) {
+                    setView(pos - viewLen * 0.05, viewLen);
+                }
+                const pct = (pos - viewStart) / viewLen * 100;
+                playheadEl.style.display = (pct < 0 || pct > 100) ? 'none' : 'block';
+                playheadEl.style.left = pct + '%';
+            }
             $('timeDisplay').textContent = `${formatTime(pos)} / ${formatTime(duration)}`;
 
             const ls = $('loopStatus');
