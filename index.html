@@ -2,79 +2,93 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Video Sampler & FX Studio</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Wavesurfer.js para la línea de tiempo y forma de onda -->
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+    <style>
+        .pad { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .handle { touch-action: none; }
+    </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 font-sans p-4 md:p-6 select-none">
     <div class="max-w-6xl mx-auto space-y-4">
-        
+
         <!-- HEADER -->
         <header class="flex items-center justify-between bg-zinc-900 px-4 py-3 rounded-xl border border-zinc-800">
             <h1 class="text-lg font-bold tracking-wide text-violet-400">Video Sampler & FX Studio</h1>
             <div class="flex items-center gap-3">
+                <span id="status" class="text-xs text-zinc-400 hidden sm:inline">Cargá un video para empezar</span>
                 <input type="file" id="upload" accept="video/*" class="hidden"/>
                 <label for="upload" class="bg-violet-600 hover:bg-violet-500 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition">
                     📂 Cargar Video
                 </label>
-                <button id="btnAudioCtx" class="bg-amber-600 hover:bg-amber-500 text-xs font-semibold px-3 py-2 rounded-lg transition">
-                    ⚡ Activar Audio API
-                </button>
             </div>
         </header>
 
         <!-- PANEL PRINCIPAL -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            
-            <!-- COLUMNA IZQUIERDA: Video Vertical + Controles y Rack (7 columnas) -->
+
+            <!-- COLUMNA IZQUIERDA -->
             <div class="lg:col-span-7 space-y-4 flex flex-col">
-                
-                <!-- Video Vertical y Estado -->
+
+                <!-- Video vertical y transporte -->
                 <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex flex-col sm:flex-row gap-4 items-center">
-                    <!-- Video más chico en vertical -->
                     <div class="relative bg-black rounded-lg overflow-hidden shadow-lg w-32 h-56 flex-shrink-0 flex items-center justify-center border border-zinc-800">
-                        <video id="videoPlayer" class="w-full h-full object-cover" crossorigin="anonymous"></video>
+                        <video id="videoPlayer" class="w-full h-full object-cover" muted playsinline></video>
                     </div>
 
-                    <!-- Info y Transporte básico -->
                     <div class="flex-1 space-y-3 w-full">
                         <div class="flex items-center justify-between">
-                            <span id="loopStatus" class="text-xs px-2.5 py-1 rounded bg-zinc-800 text-zinc-400 font-mono">Loop: OFF</span>
+                            <span id="loopStatus" class="text-xs px-2.5 py-1 rounded bg-zinc-800 text-zinc-400 font-mono">Detenido</span>
                             <span id="timeDisplay" class="text-sm font-mono text-violet-400">00:00.00 / 00:00.00</span>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-medium mb-1 text-zinc-400">Velocidad / Tempo: <span id="speedVal" class="text-zinc-100">1.0x</span></label>
+                            <label class="block text-xs font-medium mb-1 text-zinc-400">Velocidad: <span id="speedVal" class="text-zinc-100">1.00x</span> <span class="text-zinc-600">(cambia el tono, como un vinilo)</span></label>
                             <input type="range" id="speedRange" min="0.25" max="2" step="0.05" value="1" class="w-full accent-violet-500 cursor-pointer">
                         </div>
 
                         <div class="flex gap-2">
-                            <button id="btnPlayPause" class="flex-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 py-2 rounded-lg text-xs font-semibold transition">Play / Pause</button>
-                            <button id="btnClearCues" class="bg-red-950/40 hover:bg-red-900/50 border border-red-900 text-red-400 px-3 py-2 rounded-lg text-xs transition">Limpiar CUEs</button>
+                            <button id="btnPlayPause" class="flex-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 py-2 rounded-lg text-xs font-semibold transition">▶ Play / Pause (barra espaciadora)</button>
+                            <button id="btnClearCues" class="bg-red-950/40 hover:bg-red-900/50 border border-red-900 text-red-400 px-3 py-2 rounded-lg text-xs transition">Limpiar pads</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- LÍNEA DE TIEMPO CON ONDA DE AUDIO -->
-                <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-2">
+                <!-- ONDA DE AUDIO CON MARCAS -->
+                <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-3">
                     <div class="flex items-center justify-between text-xs text-zinc-400">
-                        <span class="font-semibold text-zinc-300">Forma de Onda & Loop Segmento</span>
-                        <div class="space-x-2">
-                            <button id="btnSetIn" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-1 rounded border border-zinc-700 text-zinc-300 transition">Set IN</button>
-                            <button id="btnSetOut" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-1 rounded border border-zinc-700 text-zinc-300 transition">Set OUT</button>
-                            <button id="btnToggleLoop" class="bg-zinc-800 px-2 py-1 rounded border border-zinc-700 text-zinc-500 cursor-not-allowed" disabled>Loop OFF</button>
-                        </div>
+                        <span class="font-semibold text-zinc-300">Forma de onda y marcas de los pads</span>
+                        <span class="text-zinc-500">Clic en la onda = mover el cursor</span>
                     </div>
-                    <!-- Contenedor de la onda generado por Wavesurfer -->
-                    <div id="waveform" class="w-full bg-zinc-950 rounded-lg p-1 border border-zinc-800 cursor-pointer"></div>
+
+                    <div id="waveWrap" class="relative w-full h-24 bg-zinc-950 rounded-lg border border-zinc-800 overflow-hidden cursor-pointer">
+                        <canvas id="waveCanvas" class="absolute inset-0 w-full h-full"></canvas>
+                        <div id="regionsLayer" class="absolute inset-0 pointer-events-none"></div>
+                        <div id="playhead" class="absolute top-0 bottom-0 bg-rose-500 pointer-events-none" style="left:0%; width:2px; z-index:20;"></div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                        <span id="selInfo" class="font-mono text-zinc-300 mr-auto">Tocá un pad para seleccionarlo</span>
+                        <button id="btnSetStart" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-1 rounded border border-zinc-700 text-zinc-300 transition">Inicio = cursor</button>
+                        <button id="btnSetEnd" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-1 rounded border border-zinc-700 text-zinc-300 transition">Fin = cursor</button>
+                        <button id="btnDelPad" class="bg-red-950/40 hover:bg-red-900/50 px-2 py-1 rounded border border-red-900 text-red-400 transition">Borrar pad</button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                        <label for="padMode" class="text-zinc-400">Modo de los pads:</label>
+                        <select id="padMode" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-200">
+                            <option value="oneshot">Toque = suena una vez · Mantener = loop</option>
+                            <option value="gate">Suena en loop solo mientras se mantiene</option>
+                            <option value="latch">Loop fijo (toque para activar / apagar)</option>
+                        </select>
+                    </div>
                 </div>
 
-                <!-- RACK DE EFECTOS (Compacto) -->
+                <!-- RACK DE EFECTOS -->
                 <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-3">
                     <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Rack de Efectos FX</h3>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <!-- Vinilo -->
                         <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
                             <div class="flex items-center justify-between">
                                 <span class="text-[11px] font-bold text-violet-400">Vinilo</span>
@@ -82,7 +96,6 @@
                             </div>
                             <input type="range" id="vinylCutoff" min="500" max="15000" step="100" value="5000" class="w-full accent-violet-500">
                         </div>
-                        <!-- Compresor -->
                         <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
                             <div class="flex items-center justify-between">
                                 <span class="text-[11px] font-bold text-violet-400">Compresor</span>
@@ -90,7 +103,6 @@
                             </div>
                             <input type="range" id="compThreshold" min="-50" max="0" step="1" value="-24" class="w-full accent-violet-500">
                         </div>
-                        <!-- Delay -->
                         <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
                             <div class="flex items-center justify-between">
                                 <span class="text-[11px] font-bold text-violet-400">Delay</span>
@@ -98,7 +110,6 @@
                             </div>
                             <input type="range" id="delayMix" min="0" max="1" step="0.05" value="0.3" class="w-full accent-violet-500">
                         </div>
-                        <!-- Reverb -->
                         <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
                             <div class="flex items-center justify-between">
                                 <span class="text-[11px] font-bold text-violet-400">Reverb</span>
@@ -111,331 +122,742 @@
 
             </div>
 
-            <!-- COLUMNA DERECHA: PADS DE CUE (5 columnas - 16 pads) -->
+            <!-- COLUMNA DERECHA: PADS -->
             <div class="lg:col-span-5 bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex flex-col justify-between space-y-3">
                 <div>
                     <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Pads de CUE & Trigger</h3>
-                    <p class="text-[11px] text-zinc-500 mb-3">Toca un pad vacío para grabar la posición actual. Tócalo de nuevo para dispararla.</p>
+                    <p class="text-[11px] text-zinc-500 mb-3">Pad vacío: guarda la posición actual como inicio (dura 1 s, ajustalo arrastrando los bordes en la onda). Pad con marca: tocalo para disparar, mantenelo para loop. También funcionan las teclas 1 2 3 4 / Q W E R / A S D F / Z X C V.</p>
                 </div>
 
-                <!-- Grilla de Pads -->
-                <div id="cuePadsGrid" class="grid grid-cols-4 gap-2.5 flex-1 auto-rows-fr">
-                    <!-- Generados dinámicamente por JavaScript -->
-                </div>
+                <div id="cuePadsGrid" class="grid grid-cols-4 gap-2.5 flex-1 auto-rows-fr"></div>
             </div>
 
         </div>
     </div>
 
     <script>
-        const video = document.getElementById('videoPlayer');
-        const upload = document.getElementById('upload');
-        const speedRange = document.getElementById('speedRange');
-        const speedVal = document.getElementById('speedVal');
-        const btnPlayPause = document.getElementById('btnPlayPause');
-        const btnAudioCtx = document.getElementById('btnAudioCtx');
-        const timeDisplay = document.getElementById('timeDisplay');
-        const btnClearCues = document.getElementById('btnClearCues');
+        // ------------------------------------------------------------
+        // Referencias a elementos
+        // ------------------------------------------------------------
+        const $ = (id) => document.getElementById(id);
+        const video = $('videoPlayer');
+        video.muted = true; // el audio lo reproduce el sampler (Web Audio), el video es solo visual
+        const upload = $('upload');
+        const wave = $('waveWrap');
+        const waveCanvas = $('waveCanvas');
+        const regionsLayer = $('regionsLayer');
+        const playheadEl = $('playhead');
+        const cuePadsGrid = $('cuePadsGrid');
+        const statusEl = $('status');
 
-        // Looper elements
-        const btnSetIn = document.getElementById('btnSetIn');
-        const btnSetOut = document.getElementById('btnSetOut');
-        const btnToggleLoop = document.getElementById('btnToggleLoop');
-        const loopStatus = document.getElementById('loopStatus');
-        const cuePadsGrid = document.getElementById('cuePadsGrid');
+        // ------------------------------------------------------------
+        // Estado
+        // ------------------------------------------------------------
+        const NUM_PADS = 16;
+        const MIN_LEN = 0.02;           // largo mínimo de un sample (segundos)
+        const KEYS = '1234qwerasdfzxcv'; // teclas que disparan los pads 1..16
 
-        let wavesurfer = null;
-        let cuePoints = new Array(16).fill(null);
-        let loopIn = null;
-        let loopOut = null;
-        let isLooping = false;
-
-        // Web Audio Nodos
         let audioCtx = null;
-        let sourceNode = null;
-        let vinylFilter = null;
-        let compressor = null;
-        let delayNode = null, delayFeedback = null, delayWet = null;
-        let reverbWet = null;
-        let masterGain = null;
+        let fx = {};
+        let buffer = null;              // audio decodificado del video
+        let duration = 0;
+        let waveScale = 1;
+        let videoUrl = null;
 
-        // Función para resetear todo el estado al cargar un video nuevo
-        function resetSamplerState() {
-            cuePoints.fill(null);
-            loopIn = null;
-            loopOut = null;
-            isLooping = false;
-            
-            // Resetear UI de Looper y CUEs
-            updateLoopUI();
-            btnSetIn.classList.remove('bg-violet-600', 'text-white');
-            btnSetOut.classList.remove('bg-violet-600', 'text-white');
-            btnToggleLoop.className = 'bg-zinc-800 px-2 py-1 rounded border border-zinc-700 text-zinc-500 cursor-not-allowed';
-            btnToggleLoop.disabled = true;
-            
-            renderPads();
-        }
+        let pads = new Array(NUM_PADS).fill(null); // cada pad: { start, end } en segundos
+        let selected = -1;
+        let playhead = 0;               // posición del cursor cuando no suena nada
+        let voice = null;               // sonido que está sonando ahora
+        let rate = 1;
+        const held = new Set();         // pads que se están manteniendo apretados
+        const padEls = [];
+        const regionEls = new Array(NUM_PADS).fill(null);
 
-        function initWavesurfer(videoUrl) {
-            if (wavesurfer) {
-                wavesurfer.destroy();
+        const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+        const padColor = (i, a = 1) => `hsla(${(i * 47) % 360}, 75%, 60%, ${a})`;
+
+        function setStatus(t) { statusEl.textContent = t; }
+
+        // ------------------------------------------------------------
+        // AUDIO: creación del contexto y rack de efectos
+        // ------------------------------------------------------------
+        function makeImpulse(ctx) {
+            const len = Math.floor(ctx.sampleRate * 2.0);
+            const imp = ctx.createBuffer(2, len, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) {
+                const d = imp.getChannelData(ch);
+                for (let i = 0; i < len; i++) {
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+                }
             }
-            wavesurfer = WaveSurfer.create({
-                container: '#waveform',
-                waveColor: '#52525b',
-                progressColor: '#8b5cf6',
-                cursorColor: '#f43f5e',
-                barWidth: 2,
-                barRadius: 2,
-                height: 70,
-                normalize: true,
-                url: videoUrl
-            });
-
-            wavesurfer.on('interaction', (newTime) => {
-                video.currentTime = newTime;
-            });
+            return imp;
         }
 
-        function renderPads() {
-            cuePadsGrid.innerHTML = '';
-            cuePoints.forEach((time, index) => {
-                const pad = document.createElement('button');
-                const hasCue = time !== null;
-                
-                pad.className = `aspect-square rounded-xl font-mono text-xs font-semibold flex flex-col items-center justify-center p-2 transition border ${
-                    hasCue 
-                        ? 'bg-zinc-800 hover:bg-violet-600 border-violet-500/50 text-violet-200 shadow-lg shadow-violet-950/30' 
-                        : 'bg-zinc-950 hover:bg-zinc-800 border-zinc-800 text-zinc-600'
-                }`;
+        function buildFx() {
+            const c = audioCtx;
+            fx.input = c.createGain();
 
-                pad.innerHTML = `
-                    <span class="text-[10px] text-zinc-500 mb-1">PAD ${index + 1}</span>
-                    <span class="${hasCue ? 'text-violet-300 font-bold' : 'text-zinc-700'}">${hasCue ? time.toFixed(2) + 's' : '--'}</span>
-                `;
+            fx.vinyl = c.createBiquadFilter();
+            fx.vinyl.type = 'lowpass';
+            fx.vinyl.frequency.value = 22000;
 
-                pad.addEventListener('click', () => {
-                    if (cuePoints[index] === null) {
-                        cuePoints[index] = video.currentTime;
-                    } else {
-                        safeJumpTo(cuePoints[index]);
-                    }
-                    renderPads();
-                });
+            fx.comp = c.createDynamicsCompressor();
+            fx.comp.threshold.value = 0;
+            fx.comp.ratio.value = 1;
 
-                cuePadsGrid.appendChild(pad);
-            });
+            fx.dry = c.createGain();
+
+            fx.delay = c.createDelay(2);
+            fx.delay.delayTime.value = 0.35;
+            fx.delayFb = c.createGain();
+            fx.delayFb.gain.value = 0.4;
+            fx.delayWet = c.createGain();
+            fx.delayWet.gain.value = 0;
+
+            fx.conv = c.createConvolver();
+            fx.conv.buffer = makeImpulse(c);
+            fx.reverbWet = c.createGain();
+            fx.reverbWet.gain.value = 0;
+
+            fx.master = c.createGain();
+            fx.master.gain.value = 1;
+
+            // cadena principal
+            fx.input.connect(fx.vinyl);
+            fx.vinyl.connect(fx.comp);
+            fx.comp.connect(fx.dry);
+            fx.dry.connect(fx.master);
+
+            // delay
+            fx.comp.connect(fx.delay);
+            fx.delay.connect(fx.delayFb);
+            fx.delayFb.connect(fx.delay);
+            fx.delay.connect(fx.delayWet);
+            fx.delayWet.connect(fx.master);
+
+            // reverb
+            fx.comp.connect(fx.conv);
+            fx.conv.connect(fx.reverbWet);
+            fx.reverbWet.connect(fx.master);
+
+            fx.master.connect(c.destination);
         }
 
-        btnClearCues.addEventListener('click', () => {
-            cuePoints.fill(null);
-            renderPads();
+        function applyFx() {
+            if (!audioCtx) return;
+            const t = audioCtx.currentTime;
+            const vOn = $('vinylToggle').checked;
+            const cOn = $('compToggle').checked;
+            const dOn = $('delayToggle').checked;
+            const rOn = $('reverbToggle').checked;
+            fx.vinyl.frequency.setTargetAtTime(vOn ? parseFloat($('vinylCutoff').value) : 22000, t, 0.02);
+            fx.comp.threshold.setTargetAtTime(cOn ? parseFloat($('compThreshold').value) : 0, t, 0.02);
+            fx.comp.ratio.setTargetAtTime(cOn ? 12 : 1, t, 0.02);
+            fx.delayWet.gain.setTargetAtTime(dOn ? parseFloat($('delayMix').value) : 0, t, 0.02);
+            fx.reverbWet.gain.setTargetAtTime(rOn ? parseFloat($('reverbMix').value) : 0, t, 0.02);
+        }
+
+        ['vinylToggle', 'vinylCutoff', 'compToggle', 'compThreshold',
+         'delayToggle', 'delayMix', 'reverbToggle', 'reverbMix'].forEach((id) => {
+            $(id).addEventListener('input', applyFx);
+            $(id).addEventListener('change', applyFx);
         });
 
-        function safeJumpTo(targetTime) {
+        function ensureAudio() {
             if (!audioCtx) {
-                video.currentTime = targetTime;
+                const AC = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AC();
+                buildFx();
+                applyFx();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+
+        // ------------------------------------------------------------
+        // MOTOR DE REPRODUCCIÓN (sampler sobre el audio decodificado)
+        // ------------------------------------------------------------
+        function offOf(v) {
+            return v.accum + (audioCtx.currentTime - v.t0) * rate;
+        }
+
+        function posOf(v) {
+            const off = offOf(v);
+            if (v.loop) {
+                const L = Math.max(MIN_LEN, v.segEnd - v.segStart);
+                return v.segStart + (off % L);
+            }
+            return Math.min(v.segStart + off, v.segEnd);
+        }
+
+        function currentPos() {
+            return voice ? posOf(voice) : playhead;
+        }
+
+        function startVoice(opts) {
+            if (!buffer) return;
+            const c = ensureAudio();
+            stopVoice(false);
+
+            const src = c.createBufferSource();
+            src.buffer = buffer;
+            src.playbackRate.value = rate;
+
+            const g = c.createGain();
+            g.gain.setValueAtTime(0, c.currentTime);
+            g.gain.linearRampToValueAtTime(1, c.currentTime + 0.004);
+
+            src.connect(g);
+            g.connect(fx.input);
+
+            if (opts.loop) {
+                src.loop = true;
+                src.loopStart = opts.start;
+                src.loopEnd = opts.end;
+            }
+            src.start(0, opts.start);
+
+            const v = {
+                src, g,
+                padIndex: opts.padIndex,
+                segStart: opts.start,
+                segEnd: opts.end,
+                loop: !!opts.loop,
+                accum: 0,
+                t0: c.currentTime,
+                releasing: false
+            };
+            src.onended = () => { if (voice === v) finishVoice(v); };
+            voice = v;
+
+            // el video solo acompaña visualmente
+            try { video.currentTime = opts.start; } catch (e) {}
+            video.playbackRate = rate;
+            video.play().catch(() => {});
+        }
+
+        function stopVoice(savePos) {
+            if (!voice) return;
+            const v = voice;
+            if (savePos) playhead = posOf(v);
+            voice = null;
+            const t = audioCtx.currentTime;
+            try {
+                v.g.gain.cancelScheduledValues(t);
+                v.g.gain.setValueAtTime(v.g.gain.value, t);
+                v.g.gain.linearRampToValueAtTime(0, t + 0.006);
+                v.src.stop(t + 0.008);
+            } catch (e) {}
+            setTimeout(() => { try { v.g.disconnect(); } catch (e) {} }, 60);
+            video.pause();
+            if (savePos) { try { video.currentTime = playhead; } catch (e) {} }
+        }
+
+        function finishVoice(v) {
+            voice = null;
+            playhead = v.padIndex >= 0 ? v.segEnd : duration;
+            try { v.g.disconnect(); } catch (e) {}
+            video.pause();
+            try { video.currentTime = Math.min(playhead, duration); } catch (e) {}
+        }
+
+        // Programa el final del sample (termina la pasada actual y se corta justo en el fin de la marca)
+        function scheduleStop(v) {
+            const c = audioCtx;
+            const t = c.currentTime;
+            const remaining = Math.max(0, (v.segEnd - posOf(v)) / rate);
+            const stopT = t + remaining;
+            try {
+                v.g.gain.cancelScheduledValues(t);
+                v.g.gain.setValueAtTime(1, t);
+                v.g.gain.setValueAtTime(1, Math.max(t, stopT - 0.005));
+                v.g.gain.linearRampToValueAtTime(0, stopT);
+                v.src.stop(stopT + 0.001);
+            } catch (e) {}
+        }
+
+        function releaseVoice(v) {
+            const c = audioCtx;
+            const p0 = posOf(v);
+            v.releasing = true;
+            v.loop = false;
+            v.src.loop = false;
+            v.segStart = p0;
+            v.accum = 0;
+            v.t0 = c.currentTime;
+            scheduleStop(v);
+        }
+
+        function togglePlay() {
+            if (!buffer) return;
+            ensureAudio();
+            if (voice) { stopVoice(true); return; }
+            let s = playhead;
+            if (s >= duration - 0.05) s = 0;
+            startVoice({ padIndex: -1, start: s, end: duration, loop: false });
+        }
+
+        function seekTo(t) {
+            if (!buffer) return;
+            t = clamp(t, 0, duration);
+            if (voice && voice.padIndex === -1) {
+                startVoice({ padIndex: -1, start: t, end: duration, loop: false });
+            } else if (!voice) {
+                playhead = t;
+                try { video.currentTime = t; } catch (e) {}
+            }
+        }
+
+        // Si se edita el pad que está sonando, actualiza el loop en vivo
+        function syncVoiceToPad(i) {
+            if (!voice || voice.padIndex !== i || !voice.loop || !pads[i]) return;
+            const p = pads[i];
+            const oldPos = posOf(voice);
+            voice.segStart = p.start;
+            voice.segEnd = p.end;
+            voice.src.loopStart = p.start;
+            voice.src.loopEnd = p.end;
+            voice.accum = clamp(oldPos - p.start, 0, p.end - p.start);
+            voice.t0 = audioCtx.currentTime;
+        }
+
+        // ------------------------------------------------------------
+        // PADS
+        // ------------------------------------------------------------
+        function assignPad(i) {
+            if (!buffer) return;
+            const pos = currentPos();
+            const s = clamp(pos, 0, Math.max(0, duration - 0.05));
+            const e = Math.min(s + 1, duration);
+            pads[i] = { start: s, end: Math.max(e, s + MIN_LEN) };
+            refreshAll();
+        }
+
+        function padDown(i) {
+            if (!buffer) return;
+            ensureAudio();
+            held.add(i);
+            select(i);
+            if (!pads[i]) { assignPad(i); return; }
+
+            const mode = $('padMode').value;
+            if (mode === 'latch' && voice && voice.padIndex === i) {
+                stopVoice(true);
                 return;
             }
-            masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.002);
-            setTimeout(() => {
-                video.currentTime = targetTime;
-                masterGain.gain.setTargetAtTime(1, audioCtx.currentTime, 0.005);
-            }, 10);
+            const p = pads[i];
+            startVoice({ padIndex: i, start: p.start, end: p.end, loop: true });
         }
 
-        // --- AUDIO API SETUP ---
-        btnAudioCtx.addEventListener('click', () => {
-            if (audioCtx) return;
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            sourceNode = audioCtx.createMediaElementSource(video);
-
-            vinylFilter = audioCtx.createBiquadFilter();
-            vinylFilter.type = 'lowpass';
-            vinylFilter.frequency.value = 5000;
-
-            compressor = audioCtx.createDynamicsCompressor();
-            compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
-
-            delayNode = audioCtx.createDelay();
-            delayNode.delayTime.value = 0.35;
-            delayFeedback = audioCtx.createGain();
-            delayFeedback.gain.value = 0.4;
-            delayWet = audioCtx.createGain();
-            delayWet.gain.value = 0.0;
-            delayNode.connect(delayFeedback);
-            delayFeedback.connect(delayNode);
-            delayNode.connect(delayWet);
-
-            reverbWet = audioCtx.createGain();
-            reverbWet.gain.value = 0.0;
-            let reverbDelay = audioCtx.createDelay();
-            reverbDelay.delayTime.value = 0.05;
-            let reverbFeedback = audioCtx.createGain();
-            reverbFeedback.gain.value = 0.3;
-            reverbDelay.connect(reverbFeedback);
-            reverbFeedback.connect(reverbDelay);
-            reverbDelay.connect(reverbWet);
-
-            masterGain = audioCtx.createGain();
-            masterGain.gain.value = 1.0;
-
-            updateAudioRouting();
-
-            btnAudioCtx.textContent = "✔ Audio Activo";
-            btnAudioCtx.className = "bg-emerald-600 text-xs font-semibold px-3 py-2 rounded-lg";
-            audioCtx.resume();
-        });
-
-        function updateAudioRouting() {
-            if (!audioCtx) return;
-            sourceNode.disconnect();
-            let curr = sourceNode;
-
-            if (document.getElementById('vinylToggle').checked) {
-                curr.connect(vinylFilter);
-                curr = vinylFilter;
-            }
-            if (document.getElementById('compToggle').checked) {
-                curr.connect(compressor);
-                curr = compressor;
-            }
-            if (document.getElementById('delayToggle').checked) {
-                curr.connect(delayNode);
-                delayWet.connect(masterGain);
-            }
-            if (document.getElementById('reverbToggle').checked) {
-                curr.connect(reverbWet);
-                reverbWet.connect(masterGain);
-            }
-
-            curr.connect(masterGain);
-            masterGain.connect(audioCtx.destination);
-        }
-
-        // Eventos FX
-        document.getElementById('vinylToggle').addEventListener('change', updateAudioRouting);
-        document.getElementById('compToggle').addEventListener('change', updateAudioRouting);
-        document.getElementById('vinylCutoff').addEventListener('input', (e) => {
-            if (vinylFilter) vinylFilter.frequency.setValueAtTime(e.target.value, audioCtx.currentTime);
-        });
-        document.getElementById('compThreshold').addEventListener('input', (e) => {
-            if (compressor) compressor.threshold.setValueAtTime(e.target.value, audioCtx.currentTime);
-        });
-        document.getElementById('delayToggle').addEventListener('change', (e) => {
-            if (delayWet) delayWet.gain.value = e.target.checked ? parseFloat(document.getElementById('delayMix').value) : 0;
-            updateAudioRouting();
-        });
-        document.getElementById('delayMix').addEventListener('input', (e) => {
-            if (delayWet && document.getElementById('delayToggle').checked) delayWet.gain.value = e.target.value;
-        });
-        document.getElementById('reverbToggle').addEventListener('change', (e) => {
-            if (reverbWet) reverbWet.gain.value = e.target.checked ? parseFloat(document.getElementById('reverbMix').value) : 0;
-            updateAudioRouting();
-        });
-        document.getElementById('reverbMix').addEventListener('input', (e) => {
-            if (reverbWet && document.getElementById('reverbToggle').checked) reverbWet.gain.value = e.target.value;
-        });
-
-        // Carga de archivo
-        upload.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                // Limpiar todo lo hecho con el video anterior
-                resetSamplerState();
-
-                const url = URL.createObjectURL(file);
-                video.src = url;
-                video.load();
-                initWavesurfer(url);
-                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-            }
-        });
-
-        // Controles de transporte
-        btnPlayPause.addEventListener('click', () => {
-            if (video.paused) {
-                video.play();
-            } else {
-                video.pause();
-            }
-        });
-
-        speedRange.addEventListener('input', (e) => {
-            const val = e.target.value;
-            video.playbackRate = val;
-            speedVal.textContent = val + 'x';
-        });
-
-        // Looper
-        btnSetIn.addEventListener('click', () => {
-            loopIn = video.currentTime;
-            btnSetIn.classList.add('bg-violet-600', 'text-white');
-            checkLoopReady();
-        });
-
-        btnSetOut.addEventListener('click', () => {
-            loopOut = video.currentTime;
-            btnSetOut.classList.add('bg-violet-600', 'text-white');
-            checkLoopReady();
-        });
-
-        function checkLoopReady() {
-            if (loopIn !== null && loopOut !== null && loopIn < loopOut) {
-                btnToggleLoop.className = 'bg-zinc-800 hover:bg-emerald-600 px-2 py-1 rounded border border-emerald-700 text-emerald-400 hover:text-white transition cursor-pointer';
-                btnToggleLoop.disabled = false;
+        function padUp(i) {
+            if (!held.has(i)) return;
+            held.delete(i);
+            const mode = $('padMode').value;
+            if (mode === 'latch') return;
+            if (voice && voice.padIndex === i && !voice.releasing) {
+                if (mode === 'gate') stopVoice(true);
+                else releaseVoice(voice);
             }
         }
 
-        btnToggleLoop.addEventListener('click', () => {
-            if (loopIn === null || loopOut === null || loopIn >= loopOut) return;
-            isLooping = !isLooping;
-            updateLoopUI();
-            if (isLooping && (video.currentTime < loopIn || video.currentTime > loopOut)) {
-                safeJumpTo(loopIn);
-            }
-        });
+        function select(i) {
+            if (selected === i) return;
+            selected = i;
+            refreshAll();
+        }
 
-        function updateLoopUI() {
-            if (isLooping) {
-                loopStatus.textContent = 'Loop: ON';
-                loopStatus.className = 'text-xs px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 font-mono border border-emerald-800';
-                btnToggleLoop.className = 'bg-emerald-600 px-2 py-1 rounded border border-emerald-500 text-white cursor-pointer';
-                btnToggleLoop.textContent = 'Loop ON';
-            } else {
-                loopStatus.textContent = 'Loop: OFF';
-                loopStatus.className = 'text-xs px-2.5 py-1 rounded bg-zinc-800 text-zinc-400 font-mono';
-                if (loopIn !== null && loopOut !== null && loopIn < loopOut) {
-                    btnToggleLoop.className = 'bg-zinc-800 hover:bg-emerald-600 px-2 py-1 rounded border border-emerald-700 text-emerald-400 hover:text-white transition cursor-pointer';
+        function buildPads() {
+            cuePadsGrid.innerHTML = '';
+            for (let i = 0; i < NUM_PADS; i++) {
+                const pad = document.createElement('button');
+                pad.className = 'pad aspect-square rounded-xl font-mono text-xs font-semibold flex flex-col items-center justify-center p-1 transition border';
+                pad.innerHTML = `
+                    <span class="text-[10px] text-zinc-500 mb-1 n"></span>
+                    <span class="t text-[10px]"></span>`;
+                pad.addEventListener('pointerdown', (e) => { e.preventDefault(); padDown(i); });
+                pad.addEventListener('pointerup', () => padUp(i));
+                pad.addEventListener('pointercancel', () => padUp(i));
+                pad.addEventListener('pointerleave', () => padUp(i));
+                pad.addEventListener('contextmenu', (e) => e.preventDefault());
+                cuePadsGrid.appendChild(pad);
+                padEls.push(pad);
+            }
+        }
+
+        function updatePad(i) {
+            const el = padEls[i];
+            const p = pads[i];
+            el.querySelector('.n').textContent = `PAD ${i + 1} · ${KEYS[i].toUpperCase()}`;
+            el.querySelector('.t').textContent = p ? `${p.start.toFixed(2)}–${p.end.toFixed(2)}` : '--';
+            const sel = i === selected;
+            el.style.background = p ? padColor(i, 0.18) : '#09090b';
+            el.style.borderColor = p ? padColor(i, 0.8) : '#27272a';
+            el.style.color = p ? '#e4e4e7' : '#52525b';
+            el.style.outline = sel ? `2px solid ${padColor(i, 1)}` : 'none';
+            el.style.outlineOffset = '1px';
+        }
+
+        let lastActivePad = -2;
+        function updateActivePad() {
+            const a = voice ? voice.padIndex : -1;
+            if (a === lastActivePad) return;
+            lastActivePad = a;
+            padEls.forEach((el, i) => {
+                const p = pads[i];
+                el.style.boxShadow = (i === a && p) ? `0 0 18px ${padColor(i, 0.9)}` : 'none';
+            });
+        }
+
+        function updateSelInfo() {
+            const el = $('selInfo');
+            if (selected < 0) { el.textContent = 'Tocá un pad para seleccionarlo'; return; }
+            const p = pads[selected];
+            if (!p) { el.textContent = `Pad ${selected + 1}: vacío`; return; }
+            el.textContent = `Pad ${selected + 1}: ${p.start.toFixed(2)}s → ${p.end.toFixed(2)}s (${(p.end - p.start).toFixed(2)}s)`;
+        }
+
+        function refreshAll() {
+            for (let i = 0; i < NUM_PADS; i++) updatePad(i);
+            lastActivePad = -2;
+            renderRegions();
+            updateSelInfo();
+        }
+
+        // ------------------------------------------------------------
+        // MARCAS EN LA ONDA (arrastrables)
+        // ------------------------------------------------------------
+        function updateRegionPos(i) {
+            const el = regionEls[i];
+            const p = pads[i];
+            if (!el || !p || !duration) return;
+            el.style.left = (p.start / duration * 100) + '%';
+            el.style.width = ((p.end - p.start) / duration * 100) + '%';
+        }
+
+        function startDrag(e, mode, i) {
+            const rect = wave.getBoundingClientRect();
+            const p0 = { start: pads[i].start, end: pads[i].end };
+            const x0 = e.clientX;
+
+            const move = (ev) => {
+                const p = pads[i];
+                if (!p) return;
+                const dt = (ev.clientX - x0) / rect.width * duration;
+                if (mode === 'start') {
+                    p.start = clamp(p0.start + dt, 0, p0.end - MIN_LEN);
+                } else if (mode === 'end') {
+                    p.end = clamp(p0.end + dt, p0.start + MIN_LEN, duration);
                 } else {
-                    btnToggleLoop.className = 'bg-zinc-800 px-2 py-1 rounded border border-zinc-700 text-zinc-500 cursor-not-allowed';
+                    const len = p0.end - p0.start;
+                    const s = clamp(p0.start + dt, 0, duration - len);
+                    p.start = s;
+                    p.end = s + len;
                 }
-                btnToggleLoop.textContent = 'Loop OFF';
+                updateRegionPos(i);
+                updatePad(i);
+                updateSelInfo();
+                syncVoiceToPad(i);
+            };
+            const up = () => {
+                document.removeEventListener('pointermove', move);
+                document.removeEventListener('pointerup', up);
+                document.removeEventListener('pointercancel', up);
+            };
+            document.addEventListener('pointermove', move);
+            document.addEventListener('pointerup', up);
+            document.addEventListener('pointercancel', up);
+        }
+
+        function makeRegion(i) {
+            const sel = i === selected;
+            const el = document.createElement('div');
+            el.style.position = 'absolute';
+            el.style.top = '0';
+            el.style.bottom = '0';
+            el.style.pointerEvents = 'none';
+            el.style.background = padColor(i, sel ? 0.30 : 0.15);
+            el.style.borderLeft = `2px solid ${padColor(i, 1)}`;
+            el.style.borderRight = `2px solid ${padColor(i, 1)}`;
+            el.style.zIndex = sel ? 6 : 1;
+
+            const label = document.createElement('div');
+            label.className = 'handle';
+            label.textContent = i + 1;
+            label.style.cssText += `position:absolute;top:0;left:0;font-size:10px;font-weight:700;padding:0 6px;
+                background:${padColor(i, 1)};color:#000;pointer-events:auto;cursor:${sel ? 'grab' : 'pointer'};
+                border-radius:0 0 4px 0;white-space:nowrap;`;
+            label.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const wasSelected = selected === i;
+                select(i);
+                // mover la marca arrastrando su número
+                startDrag(e, 'move', i);
+            });
+            el.appendChild(label);
+
+            if (sel) {
+                ['start', 'end'].forEach((side) => {
+                    const h = document.createElement('div');
+                    h.className = 'handle';
+                    h.style.cssText += `position:absolute;top:0;bottom:0;width:18px;pointer-events:auto;cursor:ew-resize;
+                        ${side === 'start' ? 'left:-10px;' : 'right:-10px;'}`;
+                    const bar = document.createElement('div');
+                    bar.style.cssText = `position:absolute;top:18px;bottom:0;left:7px;width:4px;border-radius:2px;background:${padColor(i, 1)};`;
+                    h.appendChild(bar);
+                    h.addEventListener('pointerdown', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        startDrag(e, side, i);
+                    });
+                    el.appendChild(h);
+                });
+            }
+            return el;
+        }
+
+        function renderRegions() {
+            regionsLayer.innerHTML = '';
+            regionEls.fill(null);
+            if (!buffer) return;
+            const order = [];
+            for (let i = 0; i < NUM_PADS; i++) if (pads[i] && i !== selected) order.push(i);
+            if (selected >= 0 && pads[selected]) order.push(selected); // la seleccionada arriba de todas
+            order.forEach((i) => {
+                const el = makeRegion(i);
+                regionEls[i] = el;
+                regionsLayer.appendChild(el);
+                updateRegionPos(i);
+            });
+        }
+
+        // Clic en la onda = mover el cursor
+        wave.addEventListener('pointerdown', (e) => {
+            if (!buffer) return;
+            const rect = wave.getBoundingClientRect();
+            seekTo((e.clientX - rect.left) / rect.width * duration);
+        });
+
+        // Botones para ajustar el pad seleccionado con el cursor actual
+        $('btnSetStart').addEventListener('click', () => {
+            if (selected < 0 || !buffer) return;
+            const pos = currentPos();
+            if (!pads[selected]) { assignPad(selected); return; }
+            const p = pads[selected];
+            p.start = clamp(pos, 0, p.end - MIN_LEN);
+            refreshAll();
+            syncVoiceToPad(selected);
+        });
+        $('btnSetEnd').addEventListener('click', () => {
+            if (selected < 0 || !buffer) return;
+            const pos = currentPos();
+            if (!pads[selected]) { assignPad(selected); return; }
+            const p = pads[selected];
+            p.end = clamp(pos, p.start + MIN_LEN, duration);
+            refreshAll();
+            syncVoiceToPad(selected);
+        });
+        $('btnDelPad').addEventListener('click', () => {
+            if (selected < 0) return;
+            if (voice && voice.padIndex === selected) stopVoice(true);
+            pads[selected] = null;
+            refreshAll();
+        });
+        $('btnClearCues').addEventListener('click', () => {
+            if (voice && voice.padIndex >= 0) stopVoice(true);
+            pads.fill(null);
+            refreshAll();
+        });
+
+        // ------------------------------------------------------------
+        // DIBUJO DE LA FORMA DE ONDA
+        // ------------------------------------------------------------
+        function drawWave() {
+            const dpr = window.devicePixelRatio || 1;
+            const w = wave.clientWidth;
+            const h = wave.clientHeight;
+            if (!w || !h) return;
+            waveCanvas.width = Math.floor(w * dpr);
+            waveCanvas.height = Math.floor(h * dpr);
+            const g = waveCanvas.getContext('2d');
+            const W = waveCanvas.width, H = waveCanvas.height;
+            g.clearRect(0, 0, W, H);
+
+            if (!buffer) {
+                g.fillStyle = '#52525b';
+                g.font = `${12 * dpr}px sans-serif`;
+                g.textAlign = 'center';
+                g.fillText('Cargá un video para ver la onda', W / 2, H / 2 + 4 * dpr);
+                return;
+            }
+
+            const data = buffer.getChannelData(0);
+            const mid = H / 2;
+            const spp = data.length / W;
+            const stride = Math.max(1, Math.floor(spp / 40));
+
+            g.fillStyle = '#3f3f46';
+            g.fillRect(0, mid, W, 1);
+
+            g.fillStyle = '#8b8b94';
+            for (let x = 0; x < W; x++) {
+                let min = 1, max = -1;
+                const s = Math.floor(x * spp);
+                const e = Math.min(data.length, Math.floor((x + 1) * spp));
+                for (let j = s; j < e; j += stride) {
+                    const v = data[j];
+                    if (v < min) min = v;
+                    if (v > max) max = v;
+                }
+                if (max < min) { min = 0; max = 0; }
+                const y1 = mid - max * waveScale * mid * 0.95;
+                const y2 = mid - min * waveScale * mid * 0.95;
+                g.fillRect(x, y1, 1, Math.max(1, y2 - y1));
             }
         }
 
-        // Loop Monitor & Sync con Wavesurfer
-        function monitorLoop() {
-            if (!video.paused) {
-                if (isLooping && video.currentTime >= (loopOut - 0.05)) {
-                    safeJumpTo(loopIn);
-                }
-                const cur = video.currentTime;
-                const dur = video.duration || 0;
-                timeDisplay.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
-            }
-            requestAnimationFrame(monitorLoop);
+        if (window.ResizeObserver) {
+            new ResizeObserver(() => drawWave()).observe(wave);
+        } else {
+            window.addEventListener('resize', drawWave);
         }
-        requestAnimationFrame(monitorLoop);
 
+        // ------------------------------------------------------------
+        // CARGA DE VIDEO
+        // ------------------------------------------------------------
+        function resetState() {
+            if (voice) stopVoice(false);
+            pads.fill(null);
+            selected = -1;
+            playhead = 0;
+            buffer = null;
+            duration = 0;
+            held.clear();
+            refreshAll();
+            drawWave();
+        }
+
+        upload.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            resetState();
+            setStatus('Cargando audio…');
+            const c = ensureAudio();
+
+            if (videoUrl) URL.revokeObjectURL(videoUrl);
+            videoUrl = URL.createObjectURL(file);
+            video.src = videoUrl;
+            video.load();
+
+            try {
+                const arr = await file.arrayBuffer();
+                const decoded = await c.decodeAudioData(arr);
+                buffer = decoded;
+                duration = decoded.duration;
+
+                // normalización visual de la onda
+                const d = decoded.getChannelData(0);
+                let peak = 0;
+                for (let i = 0; i < d.length; i += 32) {
+                    const a = Math.abs(d[i]);
+                    if (a > peak) peak = a;
+                }
+                waveScale = peak > 0.001 ? 1 / peak : 1;
+
+                drawWave();
+                refreshAll();
+                setStatus('Listo · ' + file.name);
+            } catch (err) {
+                buffer = null;
+                duration = 0;
+                drawWave();
+                setStatus('No se pudo leer el audio de este video');
+                alert('No pude leer el audio de este video. Probá con otro archivo (mp4 o webm con audio).');
+            }
+            e.target.value = '';
+        });
+
+        // ------------------------------------------------------------
+        // CONTROLES DE TRANSPORTE
+        // ------------------------------------------------------------
+        $('btnPlayPause').addEventListener('click', togglePlay);
+
+        $('speedRange').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (voice) {
+                voice.accum = offOf(voice);        // guardo lo recorrido con la velocidad vieja
+                voice.t0 = audioCtx.currentTime;
+            }
+            rate = val;
+            $('speedVal').textContent = val.toFixed(2) + 'x';
+            if (voice) {
+                voice.src.playbackRate.setValueAtTime(rate, audioCtx.currentTime);
+                video.playbackRate = rate;
+                if (voice.releasing) scheduleStop(voice);
+            }
+        });
+
+        // Teclado
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) togglePlay(); return; }
+            if (e.repeat) return;
+            const i = KEYS.indexOf(e.key.toLowerCase());
+            if (i >= 0) { e.preventDefault(); padDown(i); }
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') { e.preventDefault(); return; }
+            const i = KEYS.indexOf(e.key.toLowerCase());
+            if (i >= 0) padUp(i);
+        });
+        window.addEventListener('blur', () => { Array.from(held).forEach(padUp); });
+
+        // ------------------------------------------------------------
+        // BUCLE VISUAL (cursor, tiempo, sincronía del video)
+        // ------------------------------------------------------------
         function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            const millis = Math.floor((seconds % 1) * 100);
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${millis.toString().padStart(2, '0')}`;
+            const s = Math.max(0, seconds || 0);
+            const mins = Math.floor(s / 60);
+            const secs = Math.floor(s % 60);
+            const centis = Math.floor((s % 1) * 100);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}`;
         }
 
-        renderPads();
+        function tick() {
+            const pos = currentPos();
+            if (duration) playheadEl.style.left = (clamp(pos / duration, 0, 1) * 100) + '%';
+            $('timeDisplay').textContent = `${formatTime(pos)} / ${formatTime(duration)}`;
+
+            const ls = $('loopStatus');
+            if (voice) {
+                if (voice.padIndex >= 0) ls.textContent = `Pad ${voice.padIndex + 1}` + (voice.loop ? ' · LOOP' : ' · terminando');
+                else ls.textContent = 'Reproduciendo';
+                ls.className = 'text-xs px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 font-mono border border-emerald-800';
+
+                // mantener el video alineado con el audio
+                if (!video.seeking) {
+                    const drift = Math.abs(video.currentTime - pos);
+                    if (drift > 0.15 || (voice.loop && video.currentTime > voice.segEnd)) {
+                        try { video.currentTime = pos; } catch (e) {}
+                    }
+                }
+                if (video.paused) video.play().catch(() => {});
+            } else {
+                ls.textContent = 'Detenido';
+                ls.className = 'text-xs px-2.5 py-1 rounded bg-zinc-800 text-zinc-400 font-mono';
+            }
+
+            updateActivePad();
+            requestAnimationFrame(tick);
+        }
+
+        // ------------------------------------------------------------
+        // INICIO
+        // ------------------------------------------------------------
+        buildPads();
+        refreshAll();
+        drawWave();
+        requestAnimationFrame(tick);
     </script>
 </body>
 </html>
