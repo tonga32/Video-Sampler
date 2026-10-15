@@ -35,6 +35,7 @@
                 <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex flex-col sm:flex-row gap-4 items-center">
                     <div class="relative bg-black rounded-lg overflow-hidden shadow-lg w-40 h-72 flex-shrink-0 flex items-center justify-center border border-zinc-800">
                         <video id="videoPlayer" class="w-full h-full object-cover" muted playsinline></video>
+                        <canvas id="frameView" width="180" height="324" class="absolute inset-0 w-full h-full" style="display:none;"></canvas>
                     </div>
 
                     <div class="flex-1 space-y-3 w-full">
@@ -183,6 +184,17 @@
         let rate = 1;
         const held = new Set();         // pads que se están manteniendo apretados
         const padEls = [];
+
+        // Cuadros del video ya preparados en memoria (para que no se trabe)
+        const frameCanvas = $('frameView');
+        const fctx = frameCanvas.getContext('2d');
+        let frames = [];
+        let frameFps = 0;
+        let framesReady = false;
+        let lastFrameIdx = -1;
+        let extractToken = 0;
+        let lastVideoPos = 0;
+        let lastResync = 0;
         const regionEls = new Array(NUM_PADS).fill(null);
 
         const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -306,6 +318,136 @@
             return voice ? posOf(voice) : playhead;
         }
 
+        function drawFrameAt(t) {
+            if (!framesReady || !frames.length) return;
+            const idx = clamp(Math.round(t * frameFps), 0, frames.length - 1);
+            if (idx === lastFrameIdx) return;
+            lastFrameIdx = idx;
+            fctx.drawImage(frames[idx], 0, 0);
+        }
+
+        function visualStart(t) {
+            if (framesReady) { drawFrameAt(t); return; }
+            lastVideoPos = t;
+            lastResync = performance.now();
+            try { video.currentTime = t; } catch (e) {}
+            video.playbackRate = rate;
+            video.play().catch(() => {});
+        }
+
+        function visualSeek(t) {
+            if (framesReady) { drawFrameAt(t); return; }
+            try { video.currentTime = t; } catch (e) {}
+        }
+
+        function visualStop(t) {
+            if (!framesReady) video.pause();
+            if (t !== null) visualSeek(t);
+        }
+
+        // Plan B mientras los cuadros no están listos: el video normal, sin saltos repetidos
+        function syncVideoFallback(pos) {
+            const now = performance.now();
+            if (!video.seeking) {
+                const L = voice.segEnd - voice.segStart;
+                const wrapped = voice.loop && pos < lastVideoPos - L * 0.5;
+                const drift = Math.abs(video.currentTime - pos);
+                if ((wrapped || drift > 0.6) && now - lastResync > 250) {
+                    try { video.currentTime = pos; } catch (e) {}
+                    lastResync = now;
+                }
+                if (video.paused) video.play().catch(() => {});
+            }
+            lastVideoPos = pos;
+        }
+
+        function seekVideo(v, t) {
+            return new Promise((resolve) => {
+                if (Math.abs(v.currentTime - t) < 0.001) { resolve(); return; }
+                let done = false;
+                const fin = () => {
+                    if (done) return;
+                    done = true;
+                    v.removeEventListener('seeked', fin);
+                    clearTimeout(to);
+                    resolve();
+                };
+                const to = setTimeout(fin, 1500);
+                v.addEventListener('seeked', fin);
+                v.currentTime = t;
+            });
+        }
+
+        // Recorre el video una sola vez y guarda cuadros livianos en memoria
+        async function buildFrameCache(url, token, name) {
+            const FPS_MAX = 20, MAX_FRAMES = 540, OUT_W = 180, OUT_H = 324;
+            if (!duration) return;
+            const fps = Math.min(FPS_MAX, MAX_FRAMES / duration);
+            if (fps < 2) {
+                setStatus('Listo · ' + name + ' (video largo: se usa el video normal)');
+                return;
+            }
+            const v = document.createElement('video');
+            v.muted = true;
+            v.playsInline = true;
+            v.preload = 'auto';
+            v.src = url;
+            try {
+                await new Promise((res, rej) => {
+                    v.addEventListener('loadeddata', res, { once: true });
+                    v.addEventListener('error', rej, { once: true });
+                });
+                const vw = v.videoWidth, vh = v.videoHeight;
+                if (!vw || !vh) throw new Error('sin medidas');
+
+                // recorte centrado, igual que "object-cover"
+                const boxA = OUT_W / OUT_H, vidA = vw / vh;
+                let sx = 0, sy = 0, sw = vw, sh = vh;
+                if (vidA > boxA) { sw = vh * boxA; sx = (vw - sw) / 2; }
+                else { sh = vw / boxA; sy = (vh - sh) / 2; }
+
+                const total = Math.floor(duration * fps) + 1;
+                const out = [];
+                for (let k = 0; k < total; k++) {
+                    if (token !== extractToken) return;
+                    const t = Math.min(k / fps, Math.max(0, (v.duration || duration) - 0.05));
+                    await seekVideo(v, t);
+                    const cv = document.createElement('canvas');
+                    cv.width = OUT_W;
+                    cv.height = OUT_H;
+                    cv.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, OUT_W, OUT_H);
+                    out.push(cv);
+                    if (k % 10 === 0) {
+                        setStatus('Preparando video fluido… ' + Math.round(k / total * 100) + '%');
+                        await new Promise((r) => setTimeout(r, 0));
+                    }
+                }
+                if (token !== extractToken) return;
+
+                // control: que los cuadros no hayan salido vacíos (algunos navegadores)
+                const mid = out[Math.floor(out.length / 2)];
+                const px = mid.getContext('2d').getImageData(0, 0, OUT_W, OUT_H).data;
+                let ok = false;
+                for (let i = 3; i < px.length; i += 997 * 4) { if (px[i] > 0) { ok = true; break; } }
+                if (!ok) throw new Error('cuadros vacíos');
+
+                frames = out;
+                frameFps = fps;
+                framesReady = true;
+                lastFrameIdx = -1;
+                frameCanvas.style.display = 'block';
+                video.pause();
+                video.style.display = 'none';
+                drawFrameAt(currentPos());
+                setStatus('Listo · ' + name + ' · video fluido');
+            } catch (err) {
+                if (token === extractToken) setStatus('Listo · ' + name);
+            } finally {
+                v.removeAttribute('src');
+                v.load();
+            }
+        }
+
         function startVoice(opts) {
             if (!buffer) return;
             const c = ensureAudio();
@@ -345,9 +487,7 @@
             if (opts.padIndex === -1) showRange(opts.start, opts.start);
 
             // el video solo acompaña visualmente
-            try { video.currentTime = opts.start; } catch (e) {}
-            video.playbackRate = rate;
-            video.play().catch(() => {});
+            visualStart(opts.start);
         }
 
         function stopVoice(savePos) {
@@ -363,16 +503,14 @@
                 v.src.stop(t + 0.008);
             } catch (e) {}
             setTimeout(() => { try { v.g.disconnect(); } catch (e) {} }, 60);
-            video.pause();
-            if (savePos) { try { video.currentTime = playhead; } catch (e) {} }
+            visualStop(savePos ? playhead : null);
         }
 
         function finishVoice(v) {
             voice = null;
             playhead = v.padIndex >= 0 ? v.segEnd : duration;
             try { v.g.disconnect(); } catch (e) {}
-            video.pause();
-            try { video.currentTime = Math.min(playhead, duration); } catch (e) {}
+            visualStop(Math.min(playhead, duration));
         }
 
         // Programa el final del sample (termina la pasada actual y se corta justo en el fin de la marca)
@@ -418,7 +556,7 @@
                 startVoice({ padIndex: -1, start: t, end: duration, loop: false });
             } else if (!voice) {
                 playhead = t;
-                try { video.currentTime = t; } catch (e) {}
+                visualSeek(t);
             }
         }
 
@@ -831,6 +969,12 @@
             buffer = null;
             duration = 0;
             held.clear();
+            extractToken++;
+            frames = [];
+            framesReady = false;
+            lastFrameIdx = -1;
+            frameCanvas.style.display = 'none';
+            video.style.display = '';
             viewStart = 0;
             viewLen = 0;
             refreshAll();
@@ -869,6 +1013,7 @@
                 drawWave();
                 refreshAll();
                 setStatus('Listo · ' + file.name);
+                buildFrameCache(videoUrl, extractToken, file.name);
             } catch (err) {
                 buffer = null;
                 duration = 0;
@@ -947,19 +1092,14 @@
                 else ls.textContent = 'Reproduciendo';
                 ls.className = 'text-xs px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 font-mono border border-emerald-800';
 
-                // mantener el video alineado con el audio
-                if (!video.seeking) {
-                    const drift = Math.abs(video.currentTime - pos);
-                    if (drift > 0.15 || (voice.loop && video.currentTime > voice.segEnd)) {
-                        try { video.currentTime = pos; } catch (e) {}
-                    }
-                }
-                if (video.paused) video.play().catch(() => {});
+                // plan B: mientras los cuadros se preparan, el video normal acompaña
+                if (!framesReady) syncVideoFallback(pos);
             } else {
                 ls.textContent = 'Detenido';
                 ls.className = 'text-xs px-2.5 py-1 rounded bg-zinc-800 text-zinc-400 font-mono';
             }
 
+            if (framesReady) drawFrameAt(pos);
             updateActivePad();
             requestAnimationFrame(tick);
         }
