@@ -2,117 +2,128 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Video Sampler & FX Rack Pro</title>
+    <title>Video Sampler & FX Studio</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Wavesurfer.js para la línea de tiempo y forma de onda -->
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
 </head>
-<body class="bg-zinc-950 text-zinc-100 font-sans p-6">
-    <div class="max-w-4xl mx-auto space-y-6">
-        <h1 class="text-2xl font-bold tracking-wide flex items-center justify-between">
-            <span>Video Sampler & FX Rack</span>
-            <button id="btnAudioCtx" class="bg-violet-600 hover:bg-violet-500 text-xs px-3 py-1.5 rounded-lg font-mono transition">⚠️ Activar Audio API</button>
-        </h1>
+<body class="bg-zinc-950 text-zinc-100 font-sans p-4 md:p-6 select-none">
+    <div class="max-w-6xl mx-auto space-y-4">
         
-        <!-- Input de Video -->
-        <input type="file" id="upload" accept="video/*" class="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-700 cursor-pointer"/>
-
-        <!-- Reproductor -->
-        <div class="relative bg-black rounded-xl overflow-hidden shadow-2xl aspect-video flex items-center justify-center border border-zinc-800">
-            <video id="videoPlayer" class="w-full h-full object-contain" crossorigin="anonymous" controls></video>
-        </div>
-
-        <!-- Controles Principales & Looper -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Velocidad / Tempo -->
-            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-3">
-                <h3 class="text-sm font-semibold text-zinc-400">Transporte & Tempo</h3>
-                <div>
-                    <label class="block text-xs font-medium mb-1">Velocidad / Pitch: <span id="speedVal">1.0x</span></label>
-                    <input type="range" id="speedRange" min="0.25" max="2" step="0.05" value="1" class="w-full accent-violet-500">
-                </div>
-                <button id="btnCue" class="w-full bg-amber-600 hover:bg-amber-500 font-semibold py-2 px-3 rounded-lg transition text-sm">Marcar CUE</button>
+        <!-- HEADER -->
+        <header class="flex items-center justify-between bg-zinc-900 px-4 py-3 rounded-xl border border-zinc-800">
+            <h1 class="text-lg font-bold tracking-wide text-violet-400">Video Sampler & FX Studio</h1>
+            <div class="flex items-center gap-3">
+                <input type="file" id="upload" accept="video/*" class="hidden"/>
+                <label for="upload" class="bg-violet-600 hover:bg-violet-500 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition">
+                    📂 Cargar Video
+                </label>
+                <button id="btnAudioCtx" class="bg-amber-600 hover:bg-amber-500 text-xs font-semibold px-3 py-2 rounded-lg transition">
+                    ⚡ Activar Audio API
+                </button>
             </div>
+        </header>
 
-            <!-- Sección de Loop (A - B) -->
-            <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-3">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-sm font-semibold text-zinc-400">Sección de Loop (A - B)</h3>
-                    <span id="loopStatus" class="text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 font-mono">Loop: OFF</span>
-                </div>
-                <div class="grid grid-cols-3 gap-2">
-                    <button id="btnSetIn" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 py-2 px-2 rounded-lg text-xs font-medium transition">
-                        Set IN <br><span id="inVal" class="text-[10px] text-zinc-400 font-mono">--:--</span>
-                    </button>
-                    <button id="btnSetOut" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 py-2 px-2 rounded-lg text-xs font-medium transition">
-                        Set OUT <br><span id="outVal" class="text-[10px] text-zinc-400 font-mono">--:--</span>
-                    </button>
-                    <button id="btnToggleLoop" class="bg-zinc-800 hover:bg-emerald-700 border border-zinc-700 py-2 px-2 rounded-lg text-xs font-medium transition text-emerald-400 hover:text-white">
-                        Loop OFF
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- RACK DE EFECTOS AUDIO (Vinilo, Compresor, Reverb, Delay) -->
-        <div class="bg-zinc-900 p-5 rounded-xl border border-zinc-800 space-y-4">
-            <h3 class="text-sm font-semibold text-zinc-400 border-b border-zinc-800 pb-2">Rack de Efectos de Audio (Web Audio API)</h3>
+        <!-- PANEL PRINCIPAL -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
             
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- COLUMNA IZQUIERDA: Video Vertical + Controles y Rack (7 columnas) -->
+            <div class="lg:col-span-7 space-y-4 flex flex-col">
                 
-                <!-- EFECTO 1: FILTRO VINILO (Simulador de corte de frecuencias de vinilo antiguo) -->
-                <div class="bg-zinc-950 p-3 rounded-lg border border-zinc-800 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-violet-400">Filtro Vinilo</span>
-                        <input type="checkbox" id="vinylToggle" class="accent-violet-500 w-4 h-4 cursor-pointer">
+                <!-- Video Vertical y Estado -->
+                <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex flex-col sm:flex-row gap-4 items-center">
+                    <!-- Video más chico en vertical -->
+                    <div class="relative bg-black rounded-lg overflow-hidden shadow-lg w-32 h-56 flex-shrink-0 flex items-center justify-center border border-zinc-800">
+                        <video id="videoPlayer" class="w-full h-full object-cover" crossorigin="anonymous"></video>
                     </div>
-                    <div>
-                        <label class="text-[10px] text-zinc-400 block">Corte Agudos (Cutoff): <span id="vinylCutVal">5000Hz</span></label>
-                        <input type="range" id="vinylCutoff" min="500" max="15000" step="100" value="5000" class="w-full accent-violet-500">
+
+                    <!-- Info y Transporte básico -->
+                    <div class="flex-1 space-y-3 w-full">
+                        <div class="flex items-center justify-between">
+                            <span id="loopStatus" class="text-xs px-2.5 py-1 rounded bg-zinc-800 text-zinc-400 font-mono">Loop: OFF</span>
+                            <span id="timeDisplay" class="text-sm font-mono text-violet-400">00:00.00 / 00:00.00</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-zinc-400">Velocidad / Tempo: <span id="speedVal" class="text-zinc-100">1.0x</span></label>
+                            <input type="range" id="speedRange" min="0.25" max="2" step="0.05" value="1" class="w-full accent-violet-500 cursor-pointer">
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button id="btnPlayPause" class="flex-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 py-2 rounded-lg text-xs font-semibold transition">Play / Pause</button>
+                            <button id="btnClearCues" class="bg-red-950/40 hover:bg-red-900/50 border border-red-900 text-red-400 px-3 py-2 rounded-lg text-xs transition">Limpiar CUEs</button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- EFECTO 2: COMPRESOR -->
-                <div class="bg-zinc-950 p-3 rounded-lg border border-zinc-800 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-violet-400">Compresor</span>
-                        <input type="checkbox" id="compToggle" class="accent-violet-500 w-4 h-4 cursor-pointer">
+                <!-- LÍNEA DE TIEMPO CON ONDA DE AUDIO -->
+                <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-2">
+                    <div class="flex items-center justify-between text-xs text-zinc-400">
+                        <span class="font-semibold text-zinc-300">Forma de Onda & Loop Segmento</span>
+                        <div class="space-x-2">
+                            <button id="btnSetIn" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-1 rounded border border-zinc-700 text-zinc-300 transition">Set IN</button>
+                            <button id="btnSetOut" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-1 rounded border border-zinc-700 text-zinc-300 transition">Set OUT</button>
+                            <button id="btnToggleLoop" class="bg-zinc-800 px-2 py-1 rounded border border-zinc-700 text-zinc-500 cursor-not-allowed" disabled>Loop OFF</button>
+                        </div>
                     </div>
-                    <div>
-                        <label class="text-[10px] text-zinc-400 block">Umbral (Threshold): <span id="compThVal">-24dB</span></label>
-                        <input type="range" id="compThreshold" min="-50" max="0" step="1" value="-24" class="w-full accent-violet-500">
-                    </div>
+                    <!-- Contenedor de la onda generado por Wavesurfer -->
+                    <div id="waveform" class="w-full bg-zinc-950 rounded-lg p-1 border border-zinc-800 cursor-pointer"></div>
                 </div>
 
-                <!-- EFECTO 3: DELAY -->
-                <div class="bg-zinc-950 p-3 rounded-lg border border-zinc-800 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-violet-400">Delay / Echo</span>
-                        <input type="checkbox" id="delayToggle" class="accent-violet-500 w-4 h-4 cursor-pointer">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-zinc-400 block">Mix / Wet: <span id="delayMixVal">30%</span></label>
-                        <input type="range" id="delayMix" min="0" max="1" step="0.05" value="0.3" class="w-full accent-violet-500">
-                    </div>
-                </div>
-
-                <!-- EFECTO 4: REVERB -->
-                <div class="bg-zinc-950 p-3 rounded-lg border border-zinc-800 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-violet-400">Reverb</span>
-                        <input type="checkbox" id="reverbToggle" class="accent-violet-500 w-4 h-4 cursor-pointer">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-zinc-400 block">Mix / Wet: <span id="reverbMixVal">30%</span></label>
-                        <input type="range" id="reverbMix" min="0" max="1" step="0.05" value="0.3" class="w-full accent-violet-500">
+                <!-- RACK DE EFECTOS (Compacto) -->
+                <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-3">
+                    <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Rack de Efectos FX</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <!-- Vinilo -->
+                        <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-bold text-violet-400">Vinilo</span>
+                                <input type="checkbox" id="vinylToggle" class="accent-violet-500 w-3.5 h-3.5 cursor-pointer">
+                            </div>
+                            <input type="range" id="vinylCutoff" min="500" max="15000" step="100" value="5000" class="w-full accent-violet-500">
+                        </div>
+                        <!-- Compresor -->
+                        <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-bold text-violet-400">Compresor</span>
+                                <input type="checkbox" id="compToggle" class="accent-violet-500 w-3.5 h-3.5 cursor-pointer">
+                            </div>
+                            <input type="range" id="compThreshold" min="-50" max="0" step="1" value="-24" class="w-full accent-violet-500">
+                        </div>
+                        <!-- Delay -->
+                        <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-bold text-violet-400">Delay</span>
+                                <input type="checkbox" id="delayToggle" class="accent-violet-500 w-3.5 h-3.5 cursor-pointer">
+                            </div>
+                            <input type="range" id="delayMix" min="0" max="1" step="0.05" value="0.3" class="w-full accent-violet-500">
+                        </div>
+                        <!-- Reverb -->
+                        <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-bold text-violet-400">Reverb</span>
+                                <input type="checkbox" id="reverbToggle" class="accent-violet-500 w-3.5 h-3.5 cursor-pointer">
+                            </div>
+                            <input type="range" id="reverbMix" min="0" max="1" step="0.05" value="0.3" class="w-full accent-violet-500">
+                        </div>
                     </div>
                 </div>
 
             </div>
-        </div>
 
-        <!-- Pads de CUE -->
-        <div>
-            <h3 class="text-sm font-semibold text-zinc-400 mb-2">Pads de CUE</h3>
-            <div id="cuePads" class="grid grid-cols-4 gap-3"></div>
+            <!-- COLUMNA DERECHA: PADS DE CUE (5 columnas - 16 pads) -->
+            <div class="lg:col-span-5 bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex flex-col justify-between space-y-3">
+                <div>
+                    <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Pads de CUE & Trigger</h3>
+                    <p class="text-[11px] text-zinc-500 mb-3">Toca un pad vacío para grabar la posición actual. Tócalo de nuevo para dispararla.</p>
+                </div>
+
+                <!-- Grilla de Pads -->
+                <div id="cuePadsGrid" class="grid grid-cols-4 gap-2.5 flex-1 auto-rows-fr">
+                    <!-- Generados dinámicamente por JavaScript -->
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -121,72 +132,143 @@
         const upload = document.getElementById('upload');
         const speedRange = document.getElementById('speedRange');
         const speedVal = document.getElementById('speedVal');
-        const btnCue = document.getElementById('btnCue');
-        const cuePads = document.getElementById('cuePads');
+        const btnPlayPause = document.getElementById('btnPlayPause');
         const btnAudioCtx = document.getElementById('btnAudioCtx');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const btnClearCues = document.getElementById('btnClearCues');
 
         // Looper elements
         const btnSetIn = document.getElementById('btnSetIn');
         const btnSetOut = document.getElementById('btnSetOut');
         const btnToggleLoop = document.getElementById('btnToggleLoop');
-        const inVal = document.getElementById('inVal');
-        const outVal = document.getElementById('outVal');
         const loopStatus = document.getElementById('loopStatus');
+        const cuePadsGrid = document.getElementById('cuePadsGrid');
 
-        let cuePoints = [];
+        let wavesurfer = null;
+        let cuePoints = new Array(16).fill(null);
         let loopIn = null;
         let loopOut = null;
         let isLooping = false;
 
-        // --- WEB AUDIO API NODOS ---
+        // Web Audio Nodos
         let audioCtx = null;
         let sourceNode = null;
         let vinylFilter = null;
         let compressor = null;
-        let delayNode = null;
-        let delayFeedback = null;
-        let delayWet = null;
-        let reverbNode = null;
+        let delayNode = null, delayFeedback = null, delayWet = null;
         let reverbWet = null;
         let masterGain = null;
 
-        function initAudioContext() {
+        // Función para resetear todo el estado al cargar un video nuevo
+        function resetSamplerState() {
+            cuePoints.fill(null);
+            loopIn = null;
+            loopOut = null;
+            isLooping = false;
+            
+            // Resetear UI de Looper y CUEs
+            updateLoopUI();
+            btnSetIn.classList.remove('bg-violet-600', 'text-white');
+            btnSetOut.classList.remove('bg-violet-600', 'text-white');
+            btnToggleLoop.className = 'bg-zinc-800 px-2 py-1 rounded border border-zinc-700 text-zinc-500 cursor-not-allowed';
+            btnToggleLoop.disabled = true;
+            
+            renderPads();
+        }
+
+        function initWavesurfer(videoUrl) {
+            if (wavesurfer) {
+                wavesurfer.destroy();
+            }
+            wavesurfer = WaveSurfer.create({
+                container: '#waveform',
+                waveColor: '#52525b',
+                progressColor: '#8b5cf6',
+                cursorColor: '#f43f5e',
+                barWidth: 2,
+                barRadius: 2,
+                height: 70,
+                normalize: true,
+                url: videoUrl
+            });
+
+            wavesurfer.on('interaction', (newTime) => {
+                video.currentTime = newTime;
+            });
+        }
+
+        function renderPads() {
+            cuePadsGrid.innerHTML = '';
+            cuePoints.forEach((time, index) => {
+                const pad = document.createElement('button');
+                const hasCue = time !== null;
+                
+                pad.className = `aspect-square rounded-xl font-mono text-xs font-semibold flex flex-col items-center justify-center p-2 transition border ${
+                    hasCue 
+                        ? 'bg-zinc-800 hover:bg-violet-600 border-violet-500/50 text-violet-200 shadow-lg shadow-violet-950/30' 
+                        : 'bg-zinc-950 hover:bg-zinc-800 border-zinc-800 text-zinc-600'
+                }`;
+
+                pad.innerHTML = `
+                    <span class="text-[10px] text-zinc-500 mb-1">PAD ${index + 1}</span>
+                    <span class="${hasCue ? 'text-violet-300 font-bold' : 'text-zinc-700'}">${hasCue ? time.toFixed(2) + 's' : '--'}</span>
+                `;
+
+                pad.addEventListener('click', () => {
+                    if (cuePoints[index] === null) {
+                        cuePoints[index] = video.currentTime;
+                    } else {
+                        safeJumpTo(cuePoints[index]);
+                    }
+                    renderPads();
+                });
+
+                cuePadsGrid.appendChild(pad);
+            });
+        }
+
+        btnClearCues.addEventListener('click', () => {
+            cuePoints.fill(null);
+            renderPads();
+        });
+
+        function safeJumpTo(targetTime) {
+            if (!audioCtx) {
+                video.currentTime = targetTime;
+                return;
+            }
+            masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.002);
+            setTimeout(() => {
+                video.currentTime = targetTime;
+                masterGain.gain.setTargetAtTime(1, audioCtx.currentTime, 0.005);
+            }, 10);
+        }
+
+        // --- AUDIO API SETUP ---
+        btnAudioCtx.addEventListener('click', () => {
             if (audioCtx) return;
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-            // 1. Crear origen desde el elemento video
             sourceNode = audioCtx.createMediaElementSource(video);
 
-            // 2. Crear Nodos de Efectos
-            // Filtro Vinilo (Biquad Lowpass simulando pérdida de agudos en vinilo viejo)
             vinylFilter = audioCtx.createBiquadFilter();
             vinylFilter.type = 'lowpass';
             vinylFilter.frequency.value = 5000;
 
-            // Compresor
             compressor = audioCtx.createDynamicsCompressor();
             compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
-            compressor.knee.setValueAtTime(30, audioCtx.currentTime);
-            compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
-            compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
-            compressor.release.setValueAtTime(0.250, audioCtx.currentTime);
 
-            // Delay / Echo
             delayNode = audioCtx.createDelay();
-            delayNode.delayTime.value = 0.35; // 350ms
+            delayNode.delayTime.value = 0.35;
             delayFeedback = audioCtx.createGain();
             delayFeedback.gain.value = 0.4;
             delayWet = audioCtx.createGain();
-            delayWet.gain.value = 0.0; // Apagado por defecto
-
+            delayWet.gain.value = 0.0;
             delayNode.connect(delayFeedback);
             delayFeedback.connect(delayNode);
             delayNode.connect(delayWet);
 
-            // Reverb simulada por convolución de impulso básico o filtro en cascada
             reverbWet = audioCtx.createGain();
             reverbWet.gain.value = 0.0;
-            // Para mantenerlo liviano sin descargar archivos externos, usamos un delay corto múltiple simulando ambiente
             let reverbDelay = audioCtx.createDelay();
             reverbDelay.delayTime.value = 0.05;
             let reverbFeedback = audioCtx.createGain();
@@ -198,148 +280,110 @@
             masterGain = audioCtx.createGain();
             masterGain.gain.value = 1.0;
 
-            // 3. Ruteo Inicial (Directo sin efectos activos)
             updateAudioRouting();
 
-            btnAudioCtx.textContent = "✔ Audio API Activa";
-            btnAudioCtx.className = "bg-emerald-600 text-xs px-3 py-1.5 rounded-lg font-mono";
+            btnAudioCtx.textContent = "✔ Audio Activo";
+            btnAudioCtx.className = "bg-emerald-600 text-xs font-semibold px-3 py-2 rounded-lg";
             audioCtx.resume();
-        }
+        });
 
         function updateAudioRouting() {
             if (!audioCtx) return;
-            // Desconectar todo antes de rutear
             sourceNode.disconnect();
-            
             let curr = sourceNode;
 
-            // Ruta de Vinilo
             if (document.getElementById('vinylToggle').checked) {
                 curr.connect(vinylFilter);
                 curr = vinylFilter;
             }
-
-            // Ruta de Compresor
             if (document.getElementById('compToggle').checked) {
                 curr.connect(compressor);
                 curr = compressor;
             }
-
-            // Bifurcación para efectos de tiempo (Delay / Reverb)
             if (document.getElementById('delayToggle').checked) {
                 curr.connect(delayNode);
                 delayWet.connect(masterGain);
             }
             if (document.getElementById('reverbToggle').checked) {
-                // Usamos delay corto como reverb simple
                 curr.connect(reverbWet);
                 reverbWet.connect(masterGain);
             }
 
-            // Salida principal a los parlantes
             curr.connect(masterGain);
             masterGain.connect(audioCtx.destination);
         }
 
-        btnAudioCtx.addEventListener('click', initAudioContext);
-
-        // Controles de interfaz de efectos
+        // Eventos FX
         document.getElementById('vinylToggle').addEventListener('change', updateAudioRouting);
         document.getElementById('compToggle').addEventListener('change', updateAudioRouting);
-        
         document.getElementById('vinylCutoff').addEventListener('input', (e) => {
-            const val = e.target.value;
-            document.getElementById('vinylCutVal').textContent = val + 'Hz';
-            if (vinylFilter) vinylFilter.frequency.setValueAtTime(val, audioCtx.currentTime);
+            if (vinylFilter) vinylFilter.frequency.setValueAtTime(e.target.value, audioCtx.currentTime);
         });
-
         document.getElementById('compThreshold').addEventListener('input', (e) => {
-            const val = e.target.value;
-            document.getElementById('compThVal').textContent = val + 'dB';
-            if (compressor) compressor.threshold.setValueAtTime(val, audioCtx.currentTime);
+            if (compressor) compressor.threshold.setValueAtTime(e.target.value, audioCtx.currentTime);
         });
-
         document.getElementById('delayToggle').addEventListener('change', (e) => {
             if (delayWet) delayWet.gain.value = e.target.checked ? parseFloat(document.getElementById('delayMix').value) : 0;
             updateAudioRouting();
         });
-
         document.getElementById('delayMix').addEventListener('input', (e) => {
-            const val = e.target.value;
-            document.getElementById('delayMixVal').textContent = Math.round(val * 100) + '%';
-            if (delayWet && document.getElementById('delayToggle').checked) delayWet.gain.value = val;
+            if (delayWet && document.getElementById('delayToggle').checked) delayWet.gain.value = e.target.value;
         });
-
         document.getElementById('reverbToggle').addEventListener('change', (e) => {
             if (reverbWet) reverbWet.gain.value = e.target.checked ? parseFloat(document.getElementById('reverbMix').value) : 0;
             updateAudioRouting();
         });
-
         document.getElementById('reverbMix').addEventListener('input', (e) => {
-            const val = e.target.value;
-            document.getElementById('reverbMixVal').textContent = Math.round(val * 100) + '%';
-            if (reverbWet && document.getElementById('reverbToggle').checked) reverbWet.gain.value = val;
+            if (reverbWet && document.getElementById('reverbToggle').checked) reverbWet.gain.value = e.target.value;
         });
 
-        // --- CARGA DE VIDEO ---
+        // Carga de archivo
         upload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
-                video.src = URL.createObjectURL(file);
+                // Limpiar todo lo hecho con el video anterior
+                resetSamplerState();
+
+                const url = URL.createObjectURL(file);
+                video.src = url;
                 video.load();
-                if (audioCtx && audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
+                initWavesurfer(url);
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
             }
         });
 
-        // Control de velocidad
+        // Controles de transporte
+        btnPlayPause.addEventListener('click', () => {
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
+        });
+
         speedRange.addEventListener('input', (e) => {
             const val = e.target.value;
             video.playbackRate = val;
             speedVal.textContent = val + 'x';
         });
 
-        // CUEs
-        btnCue.addEventListener('click', () => {
-            const time = video.currentTime;
-            cuePoints.push(time);
-            renderCues();
-        });
-
-        function renderCues() {
-            cuePads.innerHTML = '';
-            cuePoints.forEach((time, index) => {
-                const btn = document.createElement('button');
-                btn.className = 'bg-zinc-800 hover:bg-violet-600 border border-zinc-700 p-3 rounded-xl font-mono text-sm transition flex flex-col items-center justify-center shadow';
-                btn.innerHTML = `<span class="text-[10px] text-zinc-400">CUE ${index + 1}</span><span>${time.toFixed(2)}s</span>`;
-                btn.addEventListener('click', () => {
-                    video.currentTime = time;
-                    video.play();
-                });
-                cuePads.appendChild(btn);
-            });
-        }
-
-        // --- LOOPER ---
+        // Looper
         btnSetIn.addEventListener('click', () => {
             loopIn = video.currentTime;
-            inVal.textContent = loopIn.toFixed(2) + 's';
+            btnSetIn.classList.add('bg-violet-600', 'text-white');
             checkLoopReady();
         });
 
         btnSetOut.addEventListener('click', () => {
             loopOut = video.currentTime;
-            outVal.textContent = loopOut.toFixed(2) + 's';
+            btnSetOut.classList.add('bg-violet-600', 'text-white');
             checkLoopReady();
         });
 
         function checkLoopReady() {
             if (loopIn !== null && loopOut !== null && loopIn < loopOut) {
-                btnToggleLoop.className = 'bg-zinc-800 hover:bg-emerald-600 border border-zinc-700 py-2 px-2 rounded-lg text-xs font-medium transition text-emerald-400 hover:text-white';
-            } else {
-                isLooping = false;
-                updateLoopUI();
+                btnToggleLoop.className = 'bg-zinc-800 hover:bg-emerald-600 px-2 py-1 rounded border border-emerald-700 text-emerald-400 hover:text-white transition cursor-pointer';
+                btnToggleLoop.disabled = false;
             }
         }
 
@@ -348,35 +392,50 @@
             isLooping = !isLooping;
             updateLoopUI();
             if (isLooping && (video.currentTime < loopIn || video.currentTime > loopOut)) {
-                video.currentTime = loopIn;
+                safeJumpTo(loopIn);
             }
         });
 
         function updateLoopUI() {
             if (isLooping) {
                 loopStatus.textContent = 'Loop: ON';
-                loopStatus.className = 'text-xs px-2 py-1 rounded bg-emerald-950 text-emerald-400 font-mono border border-emerald-800';
-                btnToggleLoop.className = 'bg-emerald-600 border border-emerald-500 py-2 px-2 rounded-lg text-xs font-medium text-white';
+                loopStatus.className = 'text-xs px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 font-mono border border-emerald-800';
+                btnToggleLoop.className = 'bg-emerald-600 px-2 py-1 rounded border border-emerald-500 text-white cursor-pointer';
                 btnToggleLoop.textContent = 'Loop ON';
             } else {
                 loopStatus.textContent = 'Loop: OFF';
-                loopStatus.className = 'text-xs px-2 py-1 rounded bg-zinc-800 text-zinc-400 font-mono';
-                btnToggleLoop.className = 'bg-zinc-800 hover:bg-emerald-700 border border-zinc-700 py-2 px-2 rounded-lg text-xs font-medium text-emerald-400';
+                loopStatus.className = 'text-xs px-2.5 py-1 rounded bg-zinc-800 text-zinc-400 font-mono';
+                if (loopIn !== null && loopOut !== null && loopIn < loopOut) {
+                    btnToggleLoop.className = 'bg-zinc-800 hover:bg-emerald-600 px-2 py-1 rounded border border-emerald-700 text-emerald-400 hover:text-white transition cursor-pointer';
+                } else {
+                    btnToggleLoop.className = 'bg-zinc-800 px-2 py-1 rounded border border-zinc-700 text-zinc-500 cursor-not-allowed';
+                }
                 btnToggleLoop.textContent = 'Loop OFF';
             }
         }
 
-        // Monitor de loop ultrarrápido con compensación de seek
+        // Loop Monitor & Sync con Wavesurfer
         function monitorLoop() {
-            if (isLooping && !video.paused) {
-                // Si estamos a menos de 50ms de llegar al final del loop, saltamos de forma preventiva
-                if (video.currentTime >= (loopOut - 0.05)) {
-                    video.currentTime = loopIn;
+            if (!video.paused) {
+                if (isLooping && video.currentTime >= (loopOut - 0.05)) {
+                    safeJumpTo(loopIn);
                 }
+                const cur = video.currentTime;
+                const dur = video.duration || 0;
+                timeDisplay.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
             }
             requestAnimationFrame(monitorLoop);
         }
         requestAnimationFrame(monitorLoop);
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const millis = Math.floor((seconds % 1) * 100);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${millis.toString().padStart(2, '0')}`;
+        }
+
+        renderPads();
     </script>
 </body>
 </html>
